@@ -4,7 +4,7 @@ Notify Me is a Flutter project built with HMS Awareness Kit and Push Kit. It aim
 
 ## Documents
  * **Awareness Kit**: 
-    * [Pub.Dev](https://pub.dev/packages/huawei_push)
+    * [Pub.Dev](https://pub.dev/packages/huawei_awareness)
     * [Huawei Documents](https://developer.huawei.com/consumer/en/doc/development/HMS-Plugin-Guides-V1/introduction-0000001074110480-V1)
  * **Push Kit**:
     * [Pub.Dev](https://pub.dev/packages/huawei_push)
