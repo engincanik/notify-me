@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:huawei_awareness/dataTypes/captureTypes/timeCategoriesResponse.dart';
 import 'package:huawei_awareness/hmsAwarenessLibrary.dart';
@@ -15,7 +17,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool locationPermission;
   bool permissions = false;
-  String responseInfo = 'Empty';
+  TimeCategoriesResponse _timeCategoriesResponse;
   final Map<String, bool> options = {'time': false, 'weather': false};
 
   @override
@@ -40,16 +42,53 @@ class _HomePageState extends State<HomePage> {
     WeatherResponse weatherResponse =
         await AwarenessCaptureClient.getWeatherByDevice();
     setState(() {
-      responseInfo = weatherResponse.hourlyWeather.toString();
+      print(weatherResponse.hourlyWeather.toString());
     });
   }
 
   void getTimeCategories() async {
     TimeCategoriesResponse timeCategoriesResponse =
         await AwarenessCaptureClient.getTimeCategories();
+    _timeCategoriesResponse = timeCategoriesResponse;
     setState(() {
-      responseInfo = timeCategoriesResponse.timeCategories[0].toString();
+      print(timeCategoriesResponse.timeCategories.toString());
+      defineTimeBarrier();
     });
+  }
+
+  void defineTimeBarrier() {
+    if (_timeCategoriesResponse != null) {
+      AwarenessBarrier timeBarrier = TimeBarrier.duringPeriodOfWeek(
+        barrierLabel: 'Day of the Week',
+        dayOfWeek: TimeBarrier.FridayCode,
+        startTimeOfSpecifiedDay: 0,
+        stopTimeOfSpecifiedDay: 86400000,
+        timeZoneId: 'Europe/Istanbul',
+      );
+      addBarrier(timeBarrier);
+    }
+  }
+
+  Future<void> addBarrier(AwarenessBarrier awarenessBarrier) async {
+    bool status = await AwarenessBarrierClient.updateBarriers(
+      barrier: awarenessBarrier,
+    );
+    if (status) {
+      print('BarrierAdded');
+      StreamSubscription<dynamic> subscription;
+      subscription =
+          AwarenessBarrierClient.onBarrierStatusStream.listen((event) {
+        if (mounted) {
+          setState(() {
+            print(event.barrierLabel +
+                ' Status: ' +
+                event.presentStatus.toString());
+          });
+        }
+      }, onError: (error) {
+        print(error.toString());
+      });
+    }
   }
 
   void saveConditionsStatus() {
@@ -85,13 +124,13 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  children: conditions.map((condition) {
-                    return ExpansionTile(
-                      title: Text(condition.name),
+          child: Expanded(
+            child: ListView(
+              children: conditions.map((condition) {
+                return ExpansionTile(
+                  title: Text(condition.name),
+                  children: [
+                    Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -114,17 +153,16 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ],
                         ),
+                        ElevatedButton(
+                          onPressed: () {},
+                          child: Text('Save'),
+                        )
                       ],
-                    );
-                  }).toList(),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {},
-                child: Text('Save'),
-              ),
-              Text(responseInfo),
-            ],
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
           ),
         ),
       ),
