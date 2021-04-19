@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.engin.notify_me">
+  <!-- Location permission, which is sensitive. After the permission is declared, you need to dynamically apply for it in the code. -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <!-- Location permission. If only the IP address-based time capture function is used, you can declare only this permission. -->
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />    
    <application
         android:label="notify_me"
         android:icon="@mipmap/ic_launcher">
