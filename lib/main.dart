@@ -18,6 +18,10 @@ class _HomePageState extends State<HomePage> {
   bool locationPermission;
   bool permissions = false;
   TimeCategoriesResponse _timeCategoriesResponse;
+  String selectedDay = 'Monday';
+  String selectedWeather = 'Sun';
+  String selectedValue = '';
+  StreamSubscription<dynamic> subscription;
   final Map<String, bool> options = {'time': false, 'weather': false};
 
   @override
@@ -38,29 +42,50 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void captureWeatherByDevice() async {
+  void captureWeatherByDevice(String weather) async {
     WeatherResponse weatherResponse =
         await AwarenessCaptureClient.getWeatherByDevice();
     setState(() {
-      print(weatherResponse.hourlyWeather.toString());
+      print('Hourly: ${weatherResponse.hourlyWeather[0].weatherId}');
     });
   }
 
-  void getTimeCategories() async {
+  void getTimeCategories(String day) async {
     TimeCategoriesResponse timeCategoriesResponse =
         await AwarenessCaptureClient.getTimeCategories();
     _timeCategoriesResponse = timeCategoriesResponse;
     setState(() {
       print(timeCategoriesResponse.timeCategories.toString());
-      defineTimeBarrier();
+      defineTimeBarrier(day);
     });
   }
 
-  void defineTimeBarrier() {
+  void defineTimeBarrier(String day) {
+    int dayOfWeekCode = 0;
+    switch (day) {
+      case 'Monday':
+        dayOfWeekCode = TimeBarrier.MondayCode;
+        break;
+      case 'Tuesday':
+        dayOfWeekCode = TimeBarrier.TuesdayCode;
+        break;
+      case 'Wednesday':
+        dayOfWeekCode = TimeBarrier.WednesdayCode;
+        break;
+      case 'Thursday':
+        dayOfWeekCode = TimeBarrier.ThursdayCode;
+        break;
+      case 'Friday':
+        dayOfWeekCode = TimeBarrier.FridayCode;
+        break;
+      default:
+        dayOfWeekCode = TimeBarrier.MondayCode;
+        break;
+    }
     if (_timeCategoriesResponse != null) {
       AwarenessBarrier timeBarrier = TimeBarrier.duringPeriodOfWeek(
         barrierLabel: 'Day of the Week',
-        dayOfWeek: TimeBarrier.FridayCode,
+        dayOfWeek: dayOfWeekCode,
         startTimeOfSpecifiedDay: 0,
         stopTimeOfSpecifiedDay: 86400000,
         timeZoneId: 'Europe/Istanbul',
@@ -75,10 +100,10 @@ class _HomePageState extends State<HomePage> {
     );
     if (status) {
       print('BarrierAdded');
-      StreamSubscription<dynamic> subscription;
       subscription =
           AwarenessBarrierClient.onBarrierStatusStream.listen((event) {
         if (mounted) {
+          // * Push notificaiton
           setState(() {
             print(event.barrierLabel +
                 ' Status: ' +
@@ -88,26 +113,22 @@ class _HomePageState extends State<HomePage> {
       }, onError: (error) {
         print(error.toString());
       });
+      subscription.onDone(() {
+        print('Subscription is done');
+      });
     }
   }
 
-  void saveConditionsStatus() {
-    //TODOWrite a saving function and save options
-  }
-
-  void returnSelectedConditionInfo(String conditionName) {
+  void returnSelectedConditionInfo(String conditionName, String selectedVal) {
     switch (conditionName) {
       case 'Time':
-        getTimeCategories();
+        getTimeCategories(selectedVal);
         break;
       case 'Weather':
-        print(conditionName);
-        break;
-      case 'Location':
-        print(conditionName);
+        captureWeatherByDevice(selectedVal);
         break;
       default:
-        print(conditionName);
+        print('Default: $conditionName');
         break;
     }
   }
@@ -143,18 +164,51 @@ class _HomePageState extends State<HomePage> {
                               onChanged: (value) {
                                 setState(() {
                                   condition.isActive = value;
-                                  options[condition.name.toLowerCase()] = value;
-                                  if (value) {
-                                    returnSelectedConditionInfo(condition.name);
-                                  }
-                                  print(options);
                                 });
                               },
                             ),
                           ],
                         ),
+                        DropdownButton(
+                          value: condition.name == 'Time'
+                              ? selectedDay
+                              : selectedWeather,
+                          icon: Icon(Icons.calendar_today),
+                          items: condition.name == 'Time'
+                              ? days.map(
+                                  (String val) {
+                                    return DropdownMenuItem<String>(
+                                      value: val,
+                                      child: Text(val),
+                                    );
+                                  },
+                                ).toList()
+                              : weathers.map(
+                                  (String val) {
+                                    return DropdownMenuItem<String>(
+                                      value: val,
+                                      child: Text(val),
+                                    );
+                                  },
+                                ).toList(),
+                          onChanged: (value) {
+                            selectedValue = value;
+                            setState(() {
+                              condition.name == 'Time'
+                                  ? selectedDay = value
+                                  : selectedWeather = value;
+                            });
+                          },
+                        ),
                         ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            if (condition.isActive) {
+                              returnSelectedConditionInfo(
+                                  condition.name, selectedValue);
+                            } else {
+                              subscription.cancel();
+                            }
+                          },
                           child: Text('Save'),
                         )
                       ],
