@@ -59,8 +59,6 @@ android {
             signingConfig signingConfigs.config
         }
         release {
-            minifyEnable true
-            shrinkResources true
             signingConfig signingConfigs.config
         }
     }
