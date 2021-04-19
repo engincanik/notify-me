@@ -5,7 +5,7 @@ List<ConditionInfo> conditions = [
   ConditionInfo('Weather', false)
 ];
 
-List<String> days = [
+const List<String> days = [
   'Monday',
   'Tuesday',
   'Wednesday',
@@ -15,4 +15,9 @@ List<String> days = [
   'Sunday'
 ];
 
-List<String> weathers = ['Sun', 'Rain', 'Snow'];
+List<String> weathers = ['Sunny', 'Rain', 'Snow'];
+
+const String timeStr = 'Time';
+const String weatherStr = 'Weather';
+const String selectedDayStr = 'selectedDay';
+const String selectedWeatherStr = 'selectedWeather';

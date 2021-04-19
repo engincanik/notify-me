@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:huawei_awareness/dataTypes/captureTypes/timeCategoriesResponse.dart';
 import 'package:huawei_awareness/hmsAwarenessLibrary.dart';
 import 'package:notify_me/data/option_data.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(HomePage());
@@ -18,16 +19,45 @@ class _HomePageState extends State<HomePage> {
   bool locationPermission;
   bool permissions = false;
   TimeCategoriesResponse _timeCategoriesResponse;
+  WeatherResponse _weatherResponse;
   String selectedDay = 'Monday';
-  String selectedWeather = 'Sun';
+  String selectedWeather = 'Sunny';
   String selectedValue = '';
   StreamSubscription<dynamic> subscription;
-  final Map<String, bool> options = {'time': false, 'weather': false};
 
   @override
   void initState() {
     super.initState();
     checkPermissions();
+    getSwitchStates();
+  }
+
+  Future<void> saveSwitchStateByConditionName(
+      String conditionName, bool isActive) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    sharedPrefs.setBool(conditionName, isActive);
+  }
+
+  Future<void> saveSelectedValue(
+      String conditionName, String selectedVal) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    sharedPrefs.setString(conditionName, selectedVal);
+  }
+
+  Future<void> getSwitchStates() async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    sharedPrefs.getBool(timeStr) != null
+        ? conditions[0].isActive = sharedPrefs.getBool(timeStr)
+        : conditions[0].isActive = false;
+    sharedPrefs.getBool(weatherStr) != null
+        ? conditions[1].isActive = sharedPrefs.getBool(weatherStr)
+        : conditions[1].isActive = false;
+    sharedPrefs.getString(selectedDayStr) != null
+        ? selectedDay = sharedPrefs.getString(selectedDayStr)
+        : selectedDay = 'Monday';
+    sharedPrefs.getString(selectedWeatherStr) != null
+        ? selectedWeather = sharedPrefs.getString(selectedWeatherStr)
+        : selectedWeather = 'Sunny';
   }
 
   void checkPermissions() async {
@@ -43,19 +73,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   void captureWeatherByDevice(String weather) async {
-    WeatherResponse weatherResponse =
-        await AwarenessCaptureClient.getWeatherByDevice();
+    _weatherResponse = await AwarenessCaptureClient.getWeatherByDevice();
     setState(() {
-      print('Hourly: ${weatherResponse.hourlyWeather[0].weatherId}');
+      defineWeatherBarrier(_weatherResponse.hourlyWeather[0].weatherId);
     });
   }
 
   void getTimeCategories(String day) async {
-    TimeCategoriesResponse timeCategoriesResponse =
-        await AwarenessCaptureClient.getTimeCategories();
-    _timeCategoriesResponse = timeCategoriesResponse;
+    _timeCategoriesResponse = await AwarenessCaptureClient.getTimeCategories();
     setState(() {
-      print(timeCategoriesResponse.timeCategories.toString());
       defineTimeBarrier(day);
     });
   }
@@ -82,15 +108,26 @@ class _HomePageState extends State<HomePage> {
         dayOfWeekCode = TimeBarrier.MondayCode;
         break;
     }
-    if (_timeCategoriesResponse != null) {
-      AwarenessBarrier timeBarrier = TimeBarrier.duringPeriodOfWeek(
-        barrierLabel: 'Day of the Week',
-        dayOfWeek: dayOfWeekCode,
-        startTimeOfSpecifiedDay: 0,
-        stopTimeOfSpecifiedDay: 86400000,
-        timeZoneId: 'Europe/Istanbul',
-      );
-      addBarrier(timeBarrier);
+    AwarenessBarrier timeBarrier = TimeBarrier.duringPeriodOfWeek(
+      barrierLabel: 'Day of the Week',
+      dayOfWeek: dayOfWeekCode,
+      startTimeOfSpecifiedDay: 0,
+      stopTimeOfSpecifiedDay: 86400000,
+      timeZoneId: 'Europe/Istanbul',
+    );
+    addBarrier(timeBarrier);
+  }
+
+  void defineWeatherBarrier(int weatherCode) {
+    switch (weatherCode) {
+      case WeatherId.Sunny:
+        break;
+      case WeatherId.Rain:
+        break;
+      case WeatherId.Snow:
+        break;
+      default:
+        break;
     }
   }
 
@@ -121,10 +158,10 @@ class _HomePageState extends State<HomePage> {
 
   void returnSelectedConditionInfo(String conditionName, String selectedVal) {
     switch (conditionName) {
-      case 'Time':
+      case timeStr:
         getTimeCategories(selectedVal);
         break;
-      case 'Weather':
+      case weatherStr:
         captureWeatherByDevice(selectedVal);
         break;
       default:
@@ -164,17 +201,19 @@ class _HomePageState extends State<HomePage> {
                               onChanged: (value) {
                                 setState(() {
                                   condition.isActive = value;
+                                  saveSwitchStateByConditionName(
+                                      condition.name, condition.isActive);
                                 });
                               },
                             ),
                           ],
                         ),
                         DropdownButton(
-                          value: condition.name == 'Time'
+                          value: condition.name == timeStr
                               ? selectedDay
                               : selectedWeather,
                           icon: Icon(Icons.calendar_today),
-                          items: condition.name == 'Time'
+                          items: condition.name == timeStr
                               ? days.map(
                                   (String val) {
                                     return DropdownMenuItem<String>(
@@ -194,9 +233,13 @@ class _HomePageState extends State<HomePage> {
                           onChanged: (value) {
                             selectedValue = value;
                             setState(() {
-                              condition.name == 'Time'
-                                  ? selectedDay = value
-                                  : selectedWeather = value;
+                              if (condition.name == timeStr) {
+                                saveSelectedValue(selectedDayStr, value);
+                                selectedDay = value;
+                              } else {
+                                saveSelectedValue(selectedWeatherStr, value);
+                                selectedWeather = value;
+                              }
                             });
                           },
                         ),
