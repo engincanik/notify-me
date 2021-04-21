@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:huawei_push/local_notification/attributes.dart';
+import 'package:huawei_push/local_notification/importance.dart';
+import 'package:huawei_push/push.dart';
 import 'package:huawei_awareness/dataTypes/captureTypes/timeCategoriesResponse.dart';
 import 'package:huawei_awareness/hmsAwarenessLibrary.dart';
 import 'package:notify_me/data/option_data.dart';
@@ -20,8 +23,8 @@ class _HomePageState extends State<HomePage> {
   bool permissions = false;
   TimeCategoriesResponse _timeCategoriesResponse;
   WeatherResponse _weatherResponse;
-  String selectedDay = 'Monday';
-  String selectedWeather = 'Sunny';
+  String selectedDay;
+  String selectedWeather;
   String selectedValue = '';
   StreamSubscription<dynamic> subscription;
 
@@ -75,7 +78,8 @@ class _HomePageState extends State<HomePage> {
   void captureWeatherByDevice(String weather) async {
     _weatherResponse = await AwarenessCaptureClient.getWeatherByDevice();
     setState(() {
-      defineWeatherBarrier(_weatherResponse.hourlyWeather[0].weatherId);
+      defineWeatherBarrier(
+          _weatherResponse.hourlyWeather[0].weatherId, weather);
     });
   }
 
@@ -87,6 +91,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void defineTimeBarrier(String day) {
+    List<String> _notificationInfo = [timeStr, selectedDay];
     int dayOfWeekCode = 0;
     switch (day) {
       case 'Monday':
@@ -104,6 +109,12 @@ class _HomePageState extends State<HomePage> {
       case 'Friday':
         dayOfWeekCode = TimeBarrier.FridayCode;
         break;
+      case 'Saturday':
+        dayOfWeekCode = TimeBarrier.SaturdayCode;
+        break;
+      case 'Sunday':
+        dayOfWeekCode = TimeBarrier.SundayCode;
+        break;
       default:
         dayOfWeekCode = TimeBarrier.MondayCode;
         break;
@@ -115,23 +126,32 @@ class _HomePageState extends State<HomePage> {
       stopTimeOfSpecifiedDay: 86400000,
       timeZoneId: 'Europe/Istanbul',
     );
-    addBarrier(timeBarrier);
+    addBarrier(timeBarrier, [timeStr, day]);
   }
 
-  void defineWeatherBarrier(int weatherCode) {
+  void defineWeatherBarrier(int weatherCode, String selectedWeather) {
+    List<String> notificationInfo = ['Weather Notification'];
     switch (weatherCode) {
       case WeatherId.Sunny:
+        notificationInfo.add(weathers[0]);
         break;
       case WeatherId.Rain:
+        notificationInfo.add(weathers[1]);
         break;
       case WeatherId.Snow:
+        notificationInfo.add(weathers[2]);
         break;
       default:
+        notificationInfo.add('Normal');
         break;
+    }
+    if (notificationInfo[1] == selectedWeather) {
+      sendLocalNotificaton(notificationInfo);
     }
   }
 
-  Future<void> addBarrier(AwarenessBarrier awarenessBarrier) async {
+  Future<void> addBarrier(
+      AwarenessBarrier awarenessBarrier, List<String> notInfo) async {
     bool status = await AwarenessBarrierClient.updateBarriers(
       barrier: awarenessBarrier,
     );
@@ -140,7 +160,12 @@ class _HomePageState extends State<HomePage> {
       subscription =
           AwarenessBarrierClient.onBarrierStatusStream.listen((event) {
         if (mounted) {
-          // * Push notificaiton
+          if (event.presentStatus == BarrierStatus.True) {
+            sendLocalNotificaton(notInfo);
+          } else {
+            print('BarrierStatus: False');
+          }
+
           setState(() {
             print(event.barrierLabel +
                 ' Status: ' +
@@ -167,6 +192,33 @@ class _HomePageState extends State<HomePage> {
       default:
         print('Default: $conditionName');
         break;
+    }
+  }
+
+  sendLocalNotificaton(List<String> notificationInfo) async {
+    if (notificationInfo[1] != selectedDay) notificationInfo[1] = selectedDay;
+    try {
+      Map<String, dynamic> localNotification = {
+        HMSLocalNotificationAttr.TITLE: notificationInfo[0],
+        HMSLocalNotificationAttr.MESSAGE: notificationInfo[1],
+        HMSLocalNotificationAttr.TICKER: "OptionalTicker",
+        HMSLocalNotificationAttr.TAG: "push-tag",
+        HMSLocalNotificationAttr.SUB_TEXT: 'Notifiy Me',
+        HMSLocalNotificationAttr.SMALL_ICON: 'ic_notification',
+        HMSLocalNotificationAttr.IMPORTANCE: Importance.MAX,
+        HMSLocalNotificationAttr.COLOR: "white",
+        HMSLocalNotificationAttr.VIBRATE: true,
+        HMSLocalNotificationAttr.VIBRATE_DURATION: 1000.0,
+        HMSLocalNotificationAttr.ONGOING: false,
+        HMSLocalNotificationAttr.DONT_NOTIFY_IN_FOREGROUND: false,
+        HMSLocalNotificationAttr.AUTO_CANCEL: false,
+        HMSLocalNotificationAttr.INVOKE_APP: false,
+      };
+      Map<String, dynamic> response =
+          await Push.localNotification(localNotification);
+      print("Pushed a local notification: " + response.toString());
+    } catch (e) {
+      print('Error: ${e.toString()}');
     }
   }
 
@@ -212,7 +264,9 @@ class _HomePageState extends State<HomePage> {
                           value: condition.name == timeStr
                               ? selectedDay
                               : selectedWeather,
-                          icon: Icon(Icons.calendar_today),
+                          icon: condition.name == timeStr
+                              ? Icon(Icons.calendar_today)
+                              : Icon(Icons.wb_sunny_rounded),
                           items: condition.name == timeStr
                               ? days.map(
                                   (String val) {
@@ -231,8 +285,8 @@ class _HomePageState extends State<HomePage> {
                                   },
                                 ).toList(),
                           onChanged: (value) {
-                            selectedValue = value;
                             setState(() {
+                              selectedValue = value;
                               if (condition.name == timeStr) {
                                 saveSelectedValue(selectedDayStr, value);
                                 selectedDay = value;
@@ -245,7 +299,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         ElevatedButton(
                           onPressed: () {
-                            if (condition.isActive) {
+                            if (condition.isActive && selectedValue != null) {
                               returnSelectedConditionInfo(
                                   condition.name, selectedValue);
                             } else {
